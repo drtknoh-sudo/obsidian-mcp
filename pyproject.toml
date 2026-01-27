@@ -32,9 +32,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/obsidian-mcp"
-Repository = "https://github.com/yourusername/obsidian-mcp"
-Issues = "https://github.com/yourusername/obsidian-mcp/issues"
+Homepage = "https://github.com/drtknoh-sudo/obsidian-mcp"
+Repository = "https://github.com/drtknoh-sudo/obsidian-mcp"
+Issues = "https://github.com/drtknoh-sudo/obsidian-mcp/issues"
 
 [project.scripts]
 obsidian-mcp = "obsidian_mcp:main"

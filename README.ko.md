@@ -40,7 +40,7 @@ AI 어시스턴트가 Obsidian 볼트를 **읽고 쓸 수 있게** 해주는 빠
 ### 1단계: 이 저장소 다운로드
 
 ```bash
-git clone https://github.com/yourusername/obsidian-mcp.git
+git clone https://github.com/drtknoh-sudo/obsidian-mcp.git
 cd obsidian-mcp
 ```
 

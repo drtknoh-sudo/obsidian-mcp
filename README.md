@@ -40,7 +40,7 @@ A fast MCP (Model Context Protocol) server that gives AI assistants **full read/
 ### Step 1: Clone this repository
 
 ```bash
-git clone https://github.com/yourusername/obsidian-mcp.git
+git clone https://github.com/drtknoh-sudo/obsidian-mcp.git
 cd obsidian-mcp
 ```
 
