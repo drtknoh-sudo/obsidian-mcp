@@ -54,13 +54,8 @@ def add_frontmatter(content: str, title: str) -> str:
     if has_frontmatter(content):
         return content
     
-    frontmatter = f"""---
-created: {get_current_date()}
-modified: {get_current_date()}
-tags: []
----
-
-"""
+    current_date = get_current_date()
+    frontmatter = f"---\ncreated: {current_date}\nmodified: {current_date}\ntags: []\n---\n\n"
     return frontmatter + content
 
 
@@ -70,8 +65,9 @@ def update_modified_date(content: str) -> str:
         return content
     
     # Find and update modified date
+    current_date = get_current_date()
     pattern = r"(modified:\s*)\d{4}-\d{2}-\d{2}"
-    replacement = f"\1{get_current_date()}"
+    replacement = f"\\1{current_date}"
     
     if re.search(pattern, content):
         return re.sub(pattern, replacement, content)
@@ -258,8 +254,7 @@ def full_text_search(query: str, limit: int = 20) -> list[dict]:
                 idx = content.lower().find(query_lower)
                 start = max(0, idx - 50)
                 end = min(len(content), idx + len(query) + 50)
-                snippet = content[start:end].replace("
-", " ")
+                snippet = content[start:end].replace("\n", " ")
                 
                 stat = md_file.stat()
                 results.append({
@@ -528,4 +523,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
