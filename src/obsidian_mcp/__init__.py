@@ -3,6 +3,12 @@ Obsidian MCP Server - Read and write Obsidian vault files
 
 A fast, local MCP server that provides full read/write access to your 
 Obsidian vault. No API keys, no rate limits, works offline.
+
+Features:
+- Auto-generates frontmatter with current date on note creation
+- Full CRUD operations (Create, Read, Update, Delete)
+- Full-text search across all notes
+- Tag management
 """
 
 import os
@@ -26,6 +32,51 @@ server = Server("obsidian-mcp")
 def get_vault_path() -> Path:
     """Get the configured vault path."""
     return Path(VAULT_PATH)
+
+
+def get_current_date() -> str:
+    """Get current date in YYYY-MM-DD format."""
+    return datetime.now().strftime("%Y-%m-%d")
+
+
+def get_current_datetime() -> str:
+    """Get current datetime in ISO format."""
+    return datetime.now().strftime("%Y-%m-%d %H:%M")
+
+
+def has_frontmatter(content: str) -> bool:
+    """Check if content already has YAML frontmatter."""
+    return content.strip().startswith("---")
+
+
+def add_frontmatter(content: str, title: str) -> str:
+    """Add YAML frontmatter with auto-generated date if not present."""
+    if has_frontmatter(content):
+        return content
+    
+    frontmatter = f"""---
+created: {get_current_date()}
+modified: {get_current_date()}
+tags: []
+---
+
+"""
+    return frontmatter + content
+
+
+def update_modified_date(content: str) -> str:
+    """Update the modified date in existing frontmatter."""
+    if not has_frontmatter(content):
+        return content
+    
+    # Find and update modified date
+    pattern = r"(modified:\s*)\d{4}-\d{2}-\d{2}"
+    replacement = f"\1{get_current_date()}"
+    
+    if re.search(pattern, content):
+        return re.sub(pattern, replacement, content)
+    
+    return content
 
 
 def is_hidden_or_system(path: Path) -> bool:
@@ -92,8 +143,8 @@ def read_note(path: str) -> dict:
         return {"error": str(e)}
 
 
-def write_note(path: str, content: str) -> dict:
-    """Write content to a note (create or update)."""
+def create_note(path: str, content: str, auto_frontmatter: bool = True) -> dict:
+    """Create a new note with optional auto-generated frontmatter."""
     vault = get_vault_path()
     
     # Ensure .md extension
@@ -106,15 +157,58 @@ def write_note(path: str, content: str) -> dict:
     if not str(file_path.resolve()).startswith(str(vault.resolve())):
         return {"error": "Access denied: path outside vault"}
     
+    # Check if file already exists
+    is_new_file = not file_path.exists()
+    
     try:
         # Create parent directories if needed
         file_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Add frontmatter for new files if requested and not already present
+        if is_new_file and auto_frontmatter:
+            content = add_frontmatter(content, file_path.stem)
+        
         file_path.write_text(content, encoding="utf-8")
         
         return {
             "success": True,
             "path": path,
-            "message": f"Note saved: {path}"
+            "message": f"Note created: {path}",
+            "created_date": get_current_date()
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def update_note(path: str, content: str, update_modified: bool = True) -> dict:
+    """Update an existing note, optionally updating the modified date."""
+    vault = get_vault_path()
+    
+    # Ensure .md extension
+    if not path.endswith(".md"):
+        path = path + ".md"
+    
+    file_path = vault / path
+    
+    # Security check
+    if not str(file_path.resolve()).startswith(str(vault.resolve())):
+        return {"error": "Access denied: path outside vault"}
+    
+    if not file_path.exists():
+        return {"error": f"File not found: {path}. Use create_note for new files."}
+    
+    try:
+        # Update modified date in frontmatter if requested
+        if update_modified:
+            content = update_modified_date(content)
+        
+        file_path.write_text(content, encoding="utf-8")
+        
+        return {
+            "success": True,
+            "path": path,
+            "message": f"Note updated: {path}",
+            "modified_date": get_current_date()
         }
     except Exception as e:
         return {"error": str(e)}
@@ -283,24 +377,26 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="create_note",
-            description="Create a new note or overwrite existing",
+            description="Create a new note with auto-generated frontmatter (created date)",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "path": {"type": "string", "description": "Path for the note (e.g., 'folder/note.md')"},
-                    "content": {"type": "string", "description": "Markdown content"}
+                    "content": {"type": "string", "description": "Markdown content"},
+                    "auto_frontmatter": {"type": "boolean", "description": "Auto-add frontmatter with date (default: true)", "default": True}
                 },
                 "required": ["path", "content"]
             }
         ),
         Tool(
             name="update_note",
-            description="Update an existing note's content",
+            description="Update an existing note (optionally updates modified date in frontmatter)",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "path": {"type": "string", "description": "Path to the note"},
-                    "content": {"type": "string", "description": "New markdown content"}
+                    "content": {"type": "string", "description": "New markdown content"},
+                    "update_modified": {"type": "boolean", "description": "Update modified date (default: true)", "default": True}
                 },
                 "required": ["path", "content"]
             }
@@ -379,9 +475,17 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         elif name == "get_note":
             result = read_note(arguments["path"])
         elif name == "create_note":
-            result = write_note(arguments["path"], arguments["content"])
+            result = create_note(
+                arguments["path"], 
+                arguments["content"],
+                auto_frontmatter=arguments.get("auto_frontmatter", True)
+            )
         elif name == "update_note":
-            result = write_note(arguments["path"], arguments["content"])
+            result = update_note(
+                arguments["path"], 
+                arguments["content"],
+                update_modified=arguments.get("update_modified", True)
+            )
         elif name == "search_notes":
             result = search_by_title(
                 arguments["query"],
